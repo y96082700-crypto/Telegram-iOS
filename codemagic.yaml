@@ -62,6 +62,44 @@ workflows:
           command -v openssl
           command -v rsync
 
+      - name: Setup Metal Toolchain
+        script: |
+          set -ex
+          # Xcode 26 起 Metal 编译器是一个可选下载组件（cryptex DMG）。
+          # 未挂载时 xcrun metal 会报 "cannot execute tool 'metal' due to
+          # missing Metal Toolchain"，bazel 的 MetalCompile 动作随之失败。
+          # 上游是在 Tart guest 里做这件事（见 TartBuild.py 的 guest_build_sh），
+          # 现在直接在 runner 上构建，就在这里复刻同样的步骤。
+          #
+          # 注意：挂载 cryptex 只是第一步。xcrun 会解析到 cryptex 里的 metal 等工具，
+          # 但 metal 本身被 XcodeDefault.xctoolchain 里的同名 stub 遮蔽，
+          # 该 stub 只会打印上面那个错误 —— 它根本不知道 cryptex 的存在。
+          # 所以还要把名字指向真正的编译器。
+
+          # 1. 挂载 Metal cryptex（若已挂载则跳过）。
+          if [ ! -d /Volumes/MetalToolchainCryptex ]; then
+            METAL_DMG="$(ls -t /System/Library/AssetsV2/com_apple_MobileAsset_MetalToolchain/*.asset/AssetData/Restore/*.dmg 2>/dev/null | head -n 1)"
+            if [ -n "$METAL_DMG" ]; then
+              echo "Mounting Metal Toolchain cryptex: $METAL_DMG"
+              hdiutil attach "$METAL_DMG" -mountpoint /Volumes/MetalToolchainCryptex -nobrowse -quiet || true
+            else
+              echo "WARNING: no Metal Toolchain cryptex found; downloading it via xcodebuild."
+              xcodebuild -downloadComponent MetalToolchain || true
+            fi
+          fi
+
+          # 2. 让 xcrun metal 指向 cryptex 里真正的编译器。
+          METAL_REAL=/Volumes/MetalToolchainCryptex/Metal.xctoolchain/usr/bin/metal
+          if [ -x "$METAL_REAL" ] && ! xcrun metal --version >/dev/null 2>&1; then
+            XCODE_SELECT_PATH="$(xcode-select -p)"
+            echo "Linking $XCODE_SELECT_PATH/Toolchains/XcodeDefault.xctoolchain/usr/bin/metal -> $METAL_REAL"
+            sudo ln -sf "$METAL_REAL" "$XCODE_SELECT_PATH/Toolchains/XcodeDefault.xctoolchain/usr/bin/metal" || true
+          fi
+
+          # 3. 验证：metal 与 metallib 都必须能跑起来。
+          xcrun metal --version
+          xcrun -f metallib
+
       - name: Import signing certificates
         script: |
           set -ex
