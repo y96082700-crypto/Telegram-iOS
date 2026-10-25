@@ -23,6 +23,10 @@ workflows:
         BUILD_VERSION: "1.0.0"
         TEAM_ID: "C67CF9S4VU"
         BUNDLE_ID: "ph.telegra.Telegraph"
+    cache:
+      cache_paths:
+        - $HOME/Library/Caches/Tart
+        - $HOME/.cache/bazel
     scripts:
       - name: Prepare build environment
         script: |
