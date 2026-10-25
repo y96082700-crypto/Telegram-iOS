@@ -2,8 +2,10 @@
 #
 # 说明：
 #  - 上游 Telegram-iOS 使用 GitLab CI + 私有签名配置仓 + 专用 Mac runner 构建。
-#  - 本项目改用 Codemagic 的 macOS 实例，通过 Tart VM 克隆
-#    versions.json 里声明的 macOS 27 + Xcode 27.1 镜像，保证工具链版本与上游一致。
+#  - 本项目改用 Codemagic 的 macOS 实例直接构建。
+#  - Codemagic 的 mac_mini_m2 提供 macOS 27.0.1 + Xcode 27.1，与 versions.json
+#    声明的 "macos": "27" / "xcode": "27.1" 工具链一致，因此无需再克隆 Tart 虚拟机，
+#    既省掉 ~25GB 镜像下载，也避开 12GB 物理内存无法承载 VM 的问题。
 #  - 签名使用仓库自带的 build-system/fake-codesigning（自签名证书），
 #    可产出可安装到真机的验证包；如需上架/分发，替换为正式证书与 profile 即可。
 #
@@ -16,7 +18,7 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
-      xcode: latest
+      xcode: "27.1"
       vars:
         # 只构建主 App，不嵌入 Watch App —— Watch 子树与本次业务集成无关，
         # 可显著缩短构建时间。嵌入 Watch 请改为 --embedWatchApp。
@@ -25,8 +27,8 @@ workflows:
         BUNDLE_ID: "ph.telegra.Telegraph"
     cache:
       cache_paths:
-        - $HOME/Library/Caches/Tart
         - $HOME/.cache/bazel
+        - $HOME/Library/Caches/CocoaPods
     scripts:
       - name: Prepare build environment
         script: |
@@ -36,45 +38,59 @@ workflows:
           test -f "build-system/Make/Make.py"
           test -f "build-system/fake-codesigning/certs/SelfSigned.p12"
           echo "Xcode: $(xcodebuild -version | head -1)"
-          echo "Bazel host: $(sw_vers -productVersion)"
+          echo "Host macOS: $(sw_vers -productVersion)"
+          # versions.json 要求 Xcode 27.1；runner 若给的是别的版本，
+          # 后面 Make.py 会直接 exit(1)，这里提前给出明确信息。
+          REQUIRED_XCODE=$(python3 -c "import json;print(json.load(open('versions.json'))['xcode'])")
+          ACTUAL_XCODE=$(xcodebuild -version | head -1 | awk '{print $2}')
+          echo "Required Xcode: $REQUIRED_XCODE / Actual: $ACTUAL_XCODE"
+
+      - name: Init submodules
+        script: |
+          set -ex
+          # 上游 Telegram-iOS 把 rlottie / tgcalls 等以相对 URL 声明为子模块，
+          # 相对 URL 会解析到 fork 所在组织的同名仓库，CI 克隆时必须带上。
+          git submodule update --init --recursive --depth 1
 
       - name: Install build dependencies
         script: |
           set -ex
-          # Tart 用于克隆与上游一致的 macOS 27 / Xcode 27.1 镜像。
-          # 注意：Tart 不是 Homebrew cask，必须从 GitHub Releases 直接安装二进制。
-          export HOMEBREW_NO_AUTO_UPDATE=1
-          export HOMEBREW_NO_ENV_HINTS=1
-          TART_VERSION="2.41.1"
-          TART_BASE="https://github.com/cirruslabs/tart/releases/download/v${TART_VERSION}"
-          TART_DIR="/usr/local/bin"
-          sudo mkdir -p "${TART_DIR}"
-          sudo curl -fsSL "${TART_BASE}/tart.tar.gz" -o /tmp/tart.tar.gz
-          sudo tar -xzf /tmp/tart.tar.gz -C "${TART_DIR}"
-          sudo chmod +x "${TART_DIR}/tart"
-          export TART_PATH="${TART_DIR}/tart"
-          echo "export TART_PATH=${TART_DIR}/tart" >> "$GITHUB_ENV" 2>/dev/null || true
-          echo "export PATH=${TART_DIR}:$PATH" >> "$GITHUB_ENV" 2>/dev/null || true
-          "${TART_DIR}/tart" --version
           # 官方构建脚本依赖 python3 / curl / openssl，brew 基础镜像已自带，
           # 这里只做存在性检查，不去改动 homebrew 仓库状态。
           command -v python3
           command -v curl
           command -v openssl
+          command -v rsync
 
-      - name: Build IPA via Tart VM
+      - name: Import signing certificates
+        script: |
+          set -ex
+          # 原先在 Tart guest 里执行这一步（见 TartBuild.py 的 guest_build_sh）。
+          # 现在直接在 runner 上构建，证书必须导入 runner 的钥匙串，
+          # 否则 codesign 找不到签名身份，bazel 会以 "no identity found" 失败。
+          python3 build-system/Make/ImportCertificates.py \
+            --path "build-system/fake-codesigning/certs"
+          security list-keychains
+          security find-identity -v -p codesigning || true
+
+      - name: Build IPA
         script: |
           set -euxo pipefail
           mkdir -p /tmp/xcodebuild_logs
           exec > >(tee /tmp/xcodebuild_logs/tg_build.log) 2>&1
 
-          python3 -u build-system/Make/Make.py vm-build \
+          # 构建号：与上游一致，用 build_number_offset + 提交数。
+          BUILD_NUMBER=$(( $(cat build_number_offset) + $(git rev-list --count HEAD) ))
+          echo "Build number: $BUILD_NUMBER"
+
+          # 直接在 runner 上构建（不再经过 Tart VM）：
+          # runner 的 Xcode 27.1 与 versions.json 要求一致。
+          python3 -u build-system/Make/Make.py build \
+            --buildNumber="$BUILD_NUMBER" \
             --configuration=release_arm64 \
             --configurationPath="build-system/appstore-configuration.json" \
             --codesigningInformationPath="build-system/fake-codesigning" \
-            --gitCodesigningType=appstore \
-            --vmCpu=4 \
-            --vmMemory=12288
+            --outputBuildArtifactsPath="build/artifacts"
 
       - name: Collect IPA
         script: |
@@ -86,4 +102,5 @@ workflows:
           find build/ios/ipa -name "*.ipa" -exec sh -c 'echo "{}: $(du -h "{}" | cut -f1)"' \;
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/artifacts/*.ipa
       - /tmp/xcodebuild_logs/*.log
