@@ -81,22 +81,42 @@ public enum SizeAdapter {
     
     /// 获取安全区域底部间距（处理刘海屏）
     public static var safeAreaBottomInset: CGFloat {
-        if #available(iOS 11.0, *) {
-            if let window = UIApplication.shared.windows.first {
-                return window.safeAreaInsets.bottom
-            }
+        if let window = BizWindowHelper.keyWindow {
+            return window.safeAreaInsets.bottom
         }
         return 0
     }
     
     /// 获取状态栏高度
     public static var statusBarHeight: CGFloat {
+        BizWindowHelper.statusBarHeight
+    }
+}
+
+/// MARK: - Window 辅助
+
+/// 统一的 window 查找逻辑，兼容多 Scene，并避免使用已废弃的 API。
+enum BizWindowHelper {
+    /// 当前 key window
+    static var keyWindow: UIWindow? {
+        if #available(iOS 13.0, *) {
+            let scenes = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+            if let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first {
+                return activeScene.windows.first(where: { $0.isKeyWindow }) ?? activeScene.windows.first
+            }
+        }
+        return nil
+    }
+    
+    /// 状态栏高度
+    static var statusBarHeight: CGFloat {
         if #available(iOS 13.0, *) {
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
                 return windowScene.statusBarManager?.statusBarFrame.height ?? 20
             }
         }
-        return UIApplication.shared.statusBarFrame.height
+        return 20
     }
 }
 
@@ -107,7 +127,7 @@ public enum UIMessageHelper {
     /// 显示 Toast（简单提示）
     public static func showToast(_ message: String, duration: TimeInterval = 2.0) {
         DispatchQueue.main.async {
-            guard let window = UIApplication.shared.windows.first else { return }
+            guard let window = BizWindowHelper.keyWindow else { return }
             
             let label = UILabel()
             label.text = message
@@ -142,7 +162,7 @@ public enum UIMessageHelper {
     /// 显示 Alert
     public static func showAlert(title: String, message: String, okTitle: String = "确定") {
         DispatchQueue.main.async {
-            guard let window = UIApplication.shared.windows.first,
+            guard let window = BizWindowHelper.keyWindow,
                   let rootViewController = window.rootViewController else {
                 return
             }
@@ -162,7 +182,7 @@ public enum UIMessageHelper {
         onOk: @escaping () -> Void
     ) {
         DispatchQueue.main.async {
-            guard let window = UIApplication.shared.windows.first,
+            guard let window = BizWindowHelper.keyWindow,
                   let rootViewController = window.rootViewController else {
                 return
             }

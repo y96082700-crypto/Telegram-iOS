@@ -25,7 +25,7 @@ extension OpenIMIntegration {
     }
     
     /// 处理 OpenIM 消息
-    private func handleOpenIMMessage(_ notification: NSNotification) {
+    private func handleOpenIMMessage(_ notification: Notification) {
         // 从通知中提取消息内容
         // 消息格式取决于 OpenIM SDK 的实现
         // 这里假设消息在 notification.userInfo["content"] 中

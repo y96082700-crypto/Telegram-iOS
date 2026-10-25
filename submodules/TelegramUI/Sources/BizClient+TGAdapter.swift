@@ -1,6 +1,6 @@
 // BizClient+TGAdapter.swift
 // 业务 API 客户端 - 为 TG 的网络框架重新设计
-// 
+//
 // 与悟空的 BizClient 不同：
 // - 悟空用 Alamofire + callback
 // - TG 使用自定义 Signal 响应式框架 + URLSession
@@ -8,6 +8,13 @@
 
 import Foundation
 import SwiftSignalKit
+
+/// HTTP 方法
+public enum BizHTTPMethod: String {
+    case get
+    case post
+    case delete
+}
 
 /// 业务 API 客户端 - 针对 TG 的网络框架
 public class BizClient {
@@ -94,7 +101,7 @@ public class BizClient {
     
     private func performRequest<T: Decodable>(
         path: String,
-        method: String,
+        method: BizHTTPMethod,
         body: Data?,
         subscriber: Subscriber<T, BizError>
     ) -> Disposable {
@@ -105,7 +112,7 @@ public class BizClient {
         }
         
         var request = URLRequest(url: url)
-        request.httpMethod = method
+        request.httpMethod = method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(getToken(), forHTTPHeaderField: "token")
         request.httpBody = body
@@ -125,10 +132,10 @@ public class BizClient {
                 let resp = try JSONDecoder().decode(BizResp<T>.self, from: data)
                 if resp.code == 0, let result = resp.data {
                     subscriber.putNext(result)
+                    subscriber.putCompletion()
                 } else {
                     subscriber.putError(.apiError(code: resp.code, message: resp.msg))
                 }
-                subscriber.putCompletion()
             } catch {
                 subscriber.putError(.decodingError(error))
             }

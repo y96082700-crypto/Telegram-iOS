@@ -72,20 +72,20 @@ public class RedPacketManager {
     // MARK: - 业务操作
     
     /// 领取红包
-    public func claimRedPacket(id: Int64) -> Signal<[String: Any], BizError> {
+    public func claimRedPacket(id: Int64) -> Signal<RedPacketInfo, BizError> {
         return BizClient.shared.post(
             path: "/api/red-packet/claim",
-            body: ["id": id]
+            body: ["id": NSNumber(value: id)]
         )
     }
     
     /// 查询红包详情
-    public func queryRedPacket(id: Int64) -> Signal<RedPacket, BizError> {
+    public func queryRedPacket(id: Int64) -> Signal<RedPacketInfo, BizError> {
         return BizClient.shared.get(path: "/api/red-packet/info/\(id)")
     }
     
     /// 查询红包列表
-    public func listRedPackets() -> Signal<[[String: Any]], BizError> {
+    public func listRedPackets() -> Signal<[RedPacketInfo], BizError> {
         return BizClient.shared.get(path: "/api/red-packet/list")
     }
     

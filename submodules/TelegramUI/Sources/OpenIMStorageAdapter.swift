@@ -12,7 +12,7 @@ class OpenIMStorageAdapter {
     private var tgDatabase: TGDatabaseManager?
     private var syncManager: SyncManager?
     
-    private init() {}
+    init() {}
     
     // MARK: - 初始化
     
@@ -268,10 +268,10 @@ class TGDatabaseImpl: TGDatabaseManager {
     
     func saveMessage(_ message: TGMessage) {
         // 保存单条消息到 ValueBox
-        // 键: "message_\(message.id)"
+        // 键: "message_<peerId>_<id>"
         // 值: message 的 JSON 序列化
         
-        let key = "message_\(message.id)"
+        let key = "message_\(message.peerId)_\(message.id)"
         let data = try? JSONEncoder().encode(message)
         
         DispatchQueue.main.async { [weak self] in
@@ -289,13 +289,13 @@ class TGDatabaseImpl: TGDatabaseManager {
     
     func getMessages(conversationID: String, limit: Int, offset: Int) -> [TGMessage] {
         // 从 ValueBox 读取消息
-        var results: [TGMessage] = []
-        
         let prefix = "message_\(conversationID)_"
-        // 查询所有匹配前缀的键
-        // 按时间排序，返回指定范围
+        let results = fetchMessages(prefix: prefix)
         
-        return results
+        guard offset < results.count else { return [] }
+        let start = offset
+        let end = min(start + limit, results.count)
+        return Array(results[start..<end])
     }
     
     // MARK: - 会话操作
@@ -318,12 +318,39 @@ class TGDatabaseImpl: TGDatabaseManager {
     }
     
     func getConversations(limit: Int) -> [TGConversation] {
-        var results: [TGConversation] = []
-        
         let prefix = "conversation_"
-        // 查询所有会话，返回指定数量
+        let results = fetchConversations(prefix: prefix)
         
-        return results
+        guard limit < results.count else { return results }
+        return Array(results[0..<limit])
+    }
+    
+    // MARK: - 私有读取辅助
+    
+    /// 读取所有以 prefix 开头的消息，按时间升序排序
+    private func fetchMessages(prefix: String) -> [TGMessage] {
+        var results: [TGMessage] = []
+        for key in valueBox.keys(withPrefix: prefix) {
+            guard let data = valueBox.get(key: key),
+                  let message = try? JSONDecoder().decode(TGMessage.self, from: data) else {
+                continue
+            }
+            results.append(message)
+        }
+        return results.sorted { $0.timestamp < $1.timestamp }
+    }
+    
+    /// 读取所有以 prefix 开头的会话，按最后消息时间降序排序
+    private func fetchConversations(prefix: String) -> [TGConversation] {
+        var results: [TGConversation] = []
+        for key in valueBox.keys(withPrefix: prefix) {
+            guard let data = valueBox.get(key: key),
+                  let conversation = try? JSONDecoder().decode(TGConversation.self, from: data) else {
+                continue
+            }
+            results.append(conversation)
+        }
+        return results.sorted { $0.lastMessageDate > $1.lastMessageDate }
     }
     
     // MARK: - 用户信息
@@ -346,4 +373,6 @@ protocol ValueBox {
     func set(key: String, value: Data)
     func get(key: String) -> Data?
     func removeValue(key: String)
+    /// 返回所有以指定前缀开头的键
+    func keys(withPrefix prefix: String) -> [String]
 }

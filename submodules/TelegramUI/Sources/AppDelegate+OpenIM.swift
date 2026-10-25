@@ -13,25 +13,19 @@ extension AppDelegate {
         // 与 OpenIM 集成一起启动，保证 BizClient 的 baseURL 先行就绪。
         setupBusinessModule()
         
-        do {
-            // 配置 OpenIM
-            let serverURL = "http://your-openim-server:10001"
-            let wsURL = "ws://your-openim-server:10002"
-            let userId = "user-id"
-            let token = "access-token"
-            
-            // 初始化（代码被注释，避免缺少依赖时崩溃）
-            // OpenIMIntegration.shared.initialize(
-            //     serverURL: serverURL,
-            //     wsURL: wsURL,
-            //     userId: userId,
-            //     token: token,
-            //     databaseManager: dbManager
-            // )
-            
-            print("✅ OpenIM 已初始化")
-        } catch {
-            print("❌ OpenIM 初始化失败: \(error)")
-        }
+        // OpenIM 客户端初始化。
+        // 当前构建未集成 OpenIM SDK（缺少该依赖），因此这里只做配置读取与日志输出，
+        // 不触发实际的 SDK 调用，避免运行时崩溃。
+        // 接入 SDK 后，将下面的配置项传入 OpenIMIntegration.shared.initialize(...) 即可。
+        let serverURL = "http://your-openim-server:10001"
+        let wsURL = "ws://your-openim-server:10002"
+        let userId = "user-id"
+        let token = "access-token"
+        
+        print("✅ OpenIM 配置就绪")
+        print("   服务器: \(serverURL)")
+        print("   长连接: \(wsURL)")
+        print("   用户 ID: \(userId)")
+        print("   Token: \(token.isEmpty ? "未设置" : "已设置")")
     }
 }

@@ -13,7 +13,7 @@ class OpenIMNetworkAdapter {
     private var messageHandler: OpenIMMessageHandler?
     private var isConnected = false
     
-    private init() {}
+    init() {}
     
     // MARK: - 初始化
     
@@ -75,7 +75,7 @@ class OpenIMNetworkAdapter {
             self.sendToOpenIM(to: String(peerId), text: text) { imResult in
                 // 3. 结合结果
                 switch (tgResult, imResult) {
-                case (.success(let tgMsg), .success(let imMsg)):
+                case (.success(let tgMsg), .success):
                     // 两个都成功，使用 TG 的消息结果
                     completion(.success(tgMsg))
                     
