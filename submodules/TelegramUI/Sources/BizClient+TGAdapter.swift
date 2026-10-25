@@ -74,7 +74,7 @@ public class BizClient {
                 bodyData = try? JSONSerialization.data(withJSONObject: body)
             }
             
-            self.performRequest(
+            return self.performRequest(
                 path: path,
                 method: .post,
                 body: bodyData,

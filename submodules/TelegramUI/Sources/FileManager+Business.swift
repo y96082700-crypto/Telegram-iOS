@@ -112,8 +112,8 @@ public class MultiThreadDownloader: NSObject, URLSessionDelegate, URLSessionDown
             }
             
             // 保存到缓存目录
-            if let filename = response?.suggestedFilename ?? url.lastPathComponent,
-               let fileData = try? Data(contentsOf: tempURL),
+            let filename = response?.suggestedFilename ?? url.lastPathComponent
+            if let fileData = try? Data(contentsOf: tempURL),
                let saveURL = FileManager.saveFile(
                    fileData,
                    filename: filename,
