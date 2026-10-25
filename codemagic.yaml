@@ -1,0 +1,89 @@
+# Codemagic 配置：Wukong 悟空 OpenIM 业务集成版 Telegram-iOS
+#
+# 说明：
+#  - 上游 Telegram-iOS 使用 GitLab CI + 私有签名配置仓 + 专用 Mac runner 构建。
+#  - 本项目改用 Codemagic 的 macOS 实例，通过 Tart VM 克隆
+#    versions.json 里声明的 macOS 27 + Xcode 27.1 镜像，保证工具链版本与上游一致。
+#  - 签名使用仓库自带的 build-system/fake-codesigning（自签名证书），
+#    可产出可安装到真机的验证包；如需上架/分发，替换为正式证书与 profile 即可。
+#
+# 触发方式：Codemagic API 或在 Codemagic 控制台点击 Start new build，
+# 选择分支 feature/wukong-openim-biz。
+
+workflows:
+  wukong_tg_adhoc:
+    name: Wukong TG iOS (OpenIM Biz)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      vars:
+        # 只构建主 App，不嵌入 Watch App —— Watch 子树与本次业务集成无关，
+        # 可显著缩短构建时间。嵌入 Watch 请改为 --embedWatchApp。
+        BUILD_VERSION: "1.0.0"
+        TEAM_ID: "C67CF9S4VU"
+        BUNDLE_ID: "ph.telegra.Telegraph"
+    cache:
+      cache_paths:
+        - $HOME/Library/Caches/Tart
+        - $HOME/.cache/bazel
+    scripts:
+      - name: Prepare build environment
+        script: |
+          set -ex
+          echo "Repo: $CM_REPO_SLUG  Branch: $CM_BRANCH  Commit: $CM_COMMIT"
+          test -f "versions.json"
+          test -f "build-system/Make/Make.py"
+          test -f "build-system/fake-codesigning/certs/SelfSigned.p12"
+          echo "Xcode: $(xcodebuild -version | head -1)"
+          echo "Bazel host: $(sw_vers -productVersion)"
+
+      - name: Install build dependencies
+        script: |
+          set -ex
+          # Tart 用于克隆与上游一致的 macOS 27 / Xcode 27.1 镜像。
+          # 注意：Tart 不是 Homebrew cask，必须从 GitHub Releases 直接安装二进制。
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          export HOMEBREW_NO_ENV_HINTS=1
+          TART_VERSION="2.41.1"
+          TART_BASE="https://github.com/cirruslabs/tart/releases/download/v${TART_VERSION}"
+          TART_DIR="/usr/local/bin"
+          sudo mkdir -p "${TART_DIR}"
+          sudo curl -fsSL "${TART_BASE}/tart.tar.gz" -o /tmp/tart.tar.gz
+          sudo tar -xzf /tmp/tart.tar.gz -C "${TART_DIR}"
+          sudo chmod +x "${TART_DIR}/tart"
+          export TART_PATH="${TART_DIR}/tart"
+          echo "export TART_PATH=${TART_DIR}/tart" >> "$GITHUB_ENV" 2>/dev/null || true
+          echo "export PATH=${TART_DIR}:$PATH" >> "$GITHUB_ENV" 2>/dev/null || true
+          "${TART_DIR}/tart" --version
+          # 官方构建脚本依赖 python3 / curl / openssl，brew 基础镜像已自带，
+          # 这里只做存在性检查，不去改动 homebrew 仓库状态。
+          command -v python3
+          command -v curl
+          command -v openssl
+
+      - name: Build IPA via Tart VM
+        script: |
+          set -euxo pipefail
+          mkdir -p /tmp/xcodebuild_logs
+          exec > >(tee /tmp/xcodebuild_logs/tg_build.log) 2>&1
+
+          python3 -u build-system/Make/Make.py vm-build \
+            --configuration=release_arm64 \
+            --configurationPath="build-system/appstore-configuration.json" \
+            --codesigningInformationPath="build-system/fake-codesigning" \
+            --gitCodesigningType=appstore \
+            --vmCpu=4 \
+            --vmMemory=12288
+
+      - name: Collect IPA
+        script: |
+          set -ex
+          mkdir -p build/ios/ipa
+          find . -name "*.ipa" -not -path "./build-input/*" -print -exec cp {} build/ios/ipa/ \; || true
+          ls -la build/ios/ipa
+          echo "--- artifacts ---"
+          find build/ios/ipa -name "*.ipa" -exec sh -c 'echo "{}: $(du -h "{}" | cut -f1)"' \;
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
