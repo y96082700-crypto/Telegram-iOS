@@ -41,11 +41,26 @@ workflows:
       - name: Install build dependencies
         script: |
           set -ex
-          # Tart 用于克隆与上游一致的 macOS 27 / Xcode 27.1 镜像
-          brew install --cask tart
-          # 官方构建脚本依赖 python3、curl、openssl 等，brew 基础镜像已包含，
-          # 这里确保 openssl 与 curl 版本可用。
-          brew install openssl curl || true
+          # Tart 用于克隆与上游一致的 macOS 27 / Xcode 27.1 镜像。
+          # 注意：Tart 不是 Homebrew cask，必须从 GitHub Releases 直接安装二进制。
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          export HOMEBREW_NO_ENV_HINTS=1
+          TART_VERSION="2.41.1"
+          TART_BASE="https://github.com/cirruslabs/tart/releases/download/v${TART_VERSION}"
+          TART_DIR="/usr/local/bin"
+          sudo mkdir -p "${TART_DIR}"
+          sudo curl -fsSL "${TART_BASE}/tart.tar.gz" -o /tmp/tart.tar.gz
+          sudo tar -xzf /tmp/tart.tar.gz -C "${TART_DIR}"
+          sudo chmod +x "${TART_DIR}/tart"
+          export TART_PATH="${TART_DIR}/tart"
+          echo "export TART_PATH=${TART_DIR}/tart" >> "$GITHUB_ENV" 2>/dev/null || true
+          echo "export PATH=${TART_DIR}:$PATH" >> "$GITHUB_ENV" 2>/dev/null || true
+          "${TART_DIR}/tart" --version
+          # 官方构建脚本依赖 python3 / curl / openssl，brew 基础镜像已自带，
+          # 这里只做存在性检查，不去改动 homebrew 仓库状态。
+          command -v python3
+          command -v curl
+          command -v openssl
 
       - name: Build IPA via Tart VM
         script: |
