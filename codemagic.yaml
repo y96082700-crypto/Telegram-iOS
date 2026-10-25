@@ -13,7 +13,7 @@
 workflows:
   wukong_tg_adhoc:
     name: Wukong TG iOS (OpenIM Biz)
-    max_build_duration: 360
+    max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
       xcode: latest
