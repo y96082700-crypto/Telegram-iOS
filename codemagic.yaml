@@ -1,4 +1,4 @@
-# Codemagic 配置：Wukong 悟空 OpenIM 业务集成版 Telegram-iOS
+# Codemagic 配置：Telegram-iOS 真机验证包构建
 #
 # 说明：
 #  - 上游 Telegram-iOS 使用 GitLab CI + 私有签名配置仓 + 专用 Mac runner 构建。
@@ -13,8 +13,8 @@
 # 选择分支 feature/wukong-openim-biz。
 
 workflows:
-  wukong_tg_adhoc:
-    name: Wukong TG iOS (OpenIM Biz)
+  tg_adhoc:
+    name: Telegram iOS (Ad Hoc)
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
