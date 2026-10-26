@@ -35,7 +35,7 @@ public class BizClient {
            !saved.isEmpty {
             self.baseURL = saved
         } else {
-            self.baseURL = "http://47.110.32.128:11002/biz/"
+            self.baseURL = "https://api.eaqenw.cn/biz/"
         }
     }
     

@@ -70,23 +70,33 @@ public class RedPacketManager {
     }
     
     // MARK: - 业务操作
-    
-    /// 领取红包
+    //
+    // 路由取自安卓端真实的 retrofit 接口 `voORamrYQTYB8ndpqe`，
+    // 并已逐条实测（2026-10-26）在 `https://api.eaqenw.cn/biz/` 上存在：
+    //   POST redpacket/join      抢红包
+    //   POST redpacket/detail    红包详情
+    //   POST redpacket/status    红包状态
+    //   GET  redpacket/received  我收到的红包
+    //   GET  redpacket/sent      我发出的红包
+    //   POST redpacket/create    发红包
+    //   POST redpacket/before    发红包前置校验
+
+    /// 抢红包
     public func claimRedPacket(id: Int64) -> Signal<RedPacketInfo, BizError> {
         return BizClient.shared.post(
-            path: "/api/red-packet/claim",
+            path: "redpacket/join",
             body: ["id": NSNumber(value: id)]
         )
     }
-    
+
     /// 查询红包详情
     public func queryRedPacket(id: Int64) -> Signal<RedPacketInfo, BizError> {
-        return BizClient.shared.get(path: "/api/red-packet/info/\(id)")
+        return BizClient.shared.post(path: "redpacket/detail", body: ["id": NSNumber(value: id)])
     }
-    
+
     /// 查询红包列表
     public func listRedPackets() -> Signal<[RedPacketInfo], BizError> {
-        return BizClient.shared.get(path: "/api/red-packet/list")
+        return BizClient.shared.get(path: "redpacket/received")
     }
     
     // MARK: - 消息事件

@@ -9,7 +9,7 @@ extension AppDelegate {
     /// 在 application(_:didFinishLaunchingWithOptions:) 中调用
     @objc func setupBusinessModule() {
         // 1. 配置业务 API 地址
-        let apiUrl = "http://47.110.32.128:11002/biz/"
+        let apiUrl = "https://api.eaqenw.cn/biz/"
         BizClient.shared.setBaseURL(apiUrl)
         
         // 2. 初始化设备信息

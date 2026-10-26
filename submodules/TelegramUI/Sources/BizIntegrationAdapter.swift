@@ -13,7 +13,8 @@ class IMController {
     
     var businessServer: String {
         get {
-            UserDefaults.standard.string(forKey: "io.openim.business.server") ?? "http://47.110.32.128"
+            UserDefaults.standard.string(forKey: "io.openim.business.server")
+                ?? "https://api.eaqenw.cn"
         }
         set {
             UserDefaults.standard.set(newValue, forKey: "io.openim.business.server")

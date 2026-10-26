@@ -23,7 +23,7 @@ public class AppConfigCache {
             if let value = cache["apiServerUrl"] as? String {
                 return value
             }
-            return "http://47.110.32.128:11002/biz/"
+            return "https://api.eaqenw.cn/biz/"
         }
         set {
             cacheLock.lock()

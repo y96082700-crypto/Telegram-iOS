@@ -11,18 +11,24 @@ public enum BizConstants {
     // MARK: - API 配置
     
     /// 业务 API 基础 URL
+    ///
+    /// 实测确认（2026-10-26）：业务后端是 `api.eaqenw.cn`，
+    /// `wukong.qgcggc.cn/biz/` 会 308 重定向到它，裸 IP
+    /// `http://47.110.147.231/biz/` 同样可用。
+    /// 注意 `47.110.32.128` 是**通信**（OpenIM）IP，不是业务 IP。
     public static var bizApiBaseUrl: String {
         if let saved = UserDefaults.standard.string(forKey: "io.openim.biz.api"),
            !saved.isEmpty {
             return saved
         }
-        return "http://47.110.32.128:11002/biz/"
+        return "https://api.eaqenw.cn/biz/"
     }
-    
-    /// 业务服务器地址
+
+    /// 业务服务器地址（业务后端 host）
     public static var businessServer: String {
         get {
-            UserDefaults.standard.string(forKey: "io.openim.business.server") ?? "47.110.32.128"
+            UserDefaults.standard.string(forKey: "io.openim.business.server")
+                ?? "api.eaqenw.cn"
         }
         set {
             UserDefaults.standard.set(newValue, forKey: "io.openim.business.server")
