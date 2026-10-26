@@ -58,7 +58,27 @@ public struct RedPacketInfo: Codable {
     /// 红包状态
     public let status: Int?
 
+    /// 编码用的键：与属性名一一对应，输出驼峰风格。
     enum CodingKeys: String, CodingKey {
+        case id
+        case message
+        case money
+        case groupId
+        case toUserId
+        case activityType
+        case activityScope
+        case sendId
+        case sendName
+        case skinId
+        case skinName
+        case claimedCount
+        case allClaimed
+        case expired
+        case status
+    }
+
+    /// 解码用的键：服务端真实键名（驼峰 + 蛇形双写兼容）。
+    enum DecodingKeys: String, CodingKey {
         case id
         case message
         case money
@@ -92,7 +112,7 @@ public struct RedPacketInfo: Codable {
     }
 
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let c = try decoder.container(keyedBy: DecodingKeys.self)
         let any = c
 
         // id: redPacketId / red_packet_id / id
@@ -157,6 +177,26 @@ public struct RedPacketInfo: Codable {
             ?? (try? any.decode(Bool.self, forKey: .allClaimedSnake))
         expired = try? any.decode(Bool.self, forKey: .expired)
         status = try? any.decode(Int.self, forKey: .status)
+    }
+
+    /// 编码：输出驼峰键，与服务端实际返回的结构保持一致。
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(message, forKey: .message)
+        try c.encode(money, forKey: .money)
+        try c.encode(groupId, forKey: .groupId)
+        try c.encodeIfPresent(toUserId, forKey: .toUserId)
+        try c.encode(activityType, forKey: .activityType)
+        try c.encode(activityScope, forKey: .activityScope)
+        try c.encodeIfPresent(sendId, forKey: .sendId)
+        try c.encodeIfPresent(sendName, forKey: .sendName)
+        try c.encodeIfPresent(skinId, forKey: .skinId)
+        try c.encodeIfPresent(skinName, forKey: .skinName)
+        try c.encodeIfPresent(claimedCount, forKey: .claimedCount)
+        try c.encodeIfPresent(allClaimed, forKey: .allClaimed)
+        try c.encodeIfPresent(expired, forKey: .expired)
+        try c.encodeIfPresent(status, forKey: .status)
     }
 }
 
